@@ -55,6 +55,8 @@ model User {
     image         String?
     accounts      Account[]
     sessions      Session[]
+    topics Topic[]
+    
 }
 
 model VerificationToken {
@@ -63,4 +65,24 @@ model VerificationToken {
     expires    DateTime
 
     @@unique([identifier, token])
+}
+
+model Topic{
+    id String @id @default(cuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    title String
+    user User @relation(fields:[userId], references: [id])
+    userId String
+    notes Note[]
+
+}
+model Note {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  title     String
+  content   String   @map("text") // Use @map to specify the PostgreSQL data type
+  topic     Topic    @relation(fields: [topicId], references: [id])
+  topicId   String
 }
