@@ -1,9 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { useSession } from "next-auth/react";
 import Head from "next/head";
+import { useState } from "react";
 
 import Header from "~/components/Header";
+import { NoteEditor } from "~/components/NoteEditor";
 
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
+
+import { NoteCard } from "~/components/NoteCard";
 
 export default function Home() {
   return (
@@ -21,28 +26,58 @@ export default function Home() {
   );
 }
 
+type Topic = RouterOutputs["topic"]["getAll"];
+
 const Content = () => {
   const { data: sessionData } = useSession();
+  const [selectedTopic, setSelectedTopic] = useState<Topic | null >(null);
 
   const { data: topics, refetch: refetchTopics } = api.topic.getAll.useQuery(
     undefined,
     {
       enabled: sessionData?.user !== undefined,
+      onSuccess: (data) => {
+        setSelectedTopic(selectedTopic ?? data[0] ?? null);
+      },
     },
   );
 
   const createTopic = api.topic.create.useMutation({
     onSuccess: () => {
       void refetchTopics();
-    }
+    },
   });
+
+  const { data: notes, refetch: refetchNotes } = api.note.getAll.useQuery(
+    {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      topicId: selectedTopic?.id ?? "",
+    },
+    {
+      enabled: sessionData?.user !== undefined && selectedTopic !== null,
+    },
+  );
+
+  const createNote = api.note.create.useMutation({
+    onSuccess: () => {
+      void refetchNotes();
+    },
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const deleteNote = api.note.delete.useMutation({
+     onSuccess: () => {
+      void refetchNotes();
+    },
+  })
+
   return (
     <div className=" mt-5 grid grid-cols-4 gap-2 ">
       <div className="px-2">
         <input
           type="text"
           placeholder="New Topic"
-          className="input input-bordered input-sm w-full h-10 "
+          className="input input-bordered input-sm h-10 w-full "
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               createTopic.mutate({
@@ -69,7 +104,29 @@ const Content = () => {
         </ul>
       </div>
 
-      <div className="col-span-3"></div>
+      <div className="col-span-3">
+        <NoteEditor
+          onSave={({ title, content }) => {
+            void createNote.mutate({
+              title,
+              content,
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+              topicId: selectedTopic?.id ?? " ",
+            });
+          }}
+        />
+        {notes?.map((note) => (
+          <div key={note.id} className="mt-5">
+            <NoteCard
+              note={note}
+              onDelete={() => {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                void deleteNote.mutate({ id: note.id });
+              }}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
